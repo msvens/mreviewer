@@ -1,0 +1,20 @@
+node_modules/
+dist/
+build/
+.svelte-kit/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# Local Claude Code settings
+.claude/settings.local.json
+agent/.claude/settings.local.json
+
+# Never commit a real instance
+/.mreviewer/
+/state/
+
+# IDE
+.idea/

@@ -1,0 +1,22 @@
+# Example instance config. Copy templates/instance/ to $MREVIEWER_HOME (default ~/.mreviewer).
+
+projects_root: ~/projects        # where your local checkouts live
+
+scheduler: launchd               # launchd | ui
+poll_interval_minutes: 15
+quiet_hours: "22:00-08:00"
+
+review:
+  review_event: comment          # comment only for now (PAT cannot request changes on own PRs)
+  max_nits: 3
+  auto_post: false               # drafts need approval
+
+notify: macos                    # macos | none
+
+repos:
+  - name: owner/example-app      # GitHub owner/repo
+    path: github.com/owner/example-app   # relative to projects_root
+    stack: sveltekit
+    role: active                 # active | maintained | stale
+    authority: true              # a source of conventions
+    run_checks: true             # run typecheck/tests on the PR head
