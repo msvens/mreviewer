@@ -39,6 +39,20 @@ docs/         runbook and design notes
 Not runnable yet. Phase 0 in the runbook covers setup: instance directory, fine-grained PAT,
 sandbox and permissions.
 
+## Development
+
+Requires Node 24+ and pnpm (the version is pinned in `package.json`; `corepack enable` picks it up).
+
+```sh
+pnpm install
+pnpm check              # typecheck + lint + unit tests; CI runs the same steps
+pnpm format             # apply Prettier formatting
+pnpm test:integration   # local only: spawns real `claude -p` runs, needs a Claude login and macOS
+```
+
+Tests live in `__tests__/` as `*.test.ts`; integration tests are `*.integration.test.ts`. Work happens on
+branches with a PR to `main`, and CI must pass before merging.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
