@@ -1,0 +1,29 @@
+{
+	"name": "mreviewer",
+	"private": true,
+	"type": "module",
+	"packageManager": "pnpm@11.22.0",
+	"engines": {
+		"node": ">=24"
+	},
+	"scripts": {
+		"check": "pnpm typecheck && pnpm lint && pnpm test",
+		"typecheck": "tsc --noEmit",
+		"lint": "prettier --check . && eslint .",
+		"format": "prettier --write .",
+		"test": "vitest run --exclude='**/*.integration.test.ts'",
+		"test:watch": "vitest --exclude='**/*.integration.test.ts'",
+		"test:integration": "vitest run integration"
+	},
+	"devDependencies": {
+		"@eslint/js": "^10.0.1",
+		"@types/node": "^24.19.2",
+		"eslint": "^10.14.0",
+		"eslint-config-prettier": "^10.1.8",
+		"globals": "^17.14.0",
+		"prettier": "^3.9.10",
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.72.1",
+		"vitest": "^5.1.0"
+	}
+}

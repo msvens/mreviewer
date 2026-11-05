@@ -1,0 +1,24 @@
+{
+	"compilerOptions": {
+		"target": "ES2024",
+		"lib": ["ES2024"],
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"types": ["node"],
+		"strict": true,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+		"verbatimModuleSyntax": true,
+		"erasableSyntaxOnly": true,
+		"allowImportingTsExtensions": true,
+		"resolveJsonModule": true,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"skipLibCheck": true,
+		"noEmit": true
+	},
+	// Node 24 runs .ts directly (type stripping), so code imports with .ts extensions and uses only
+	// erasable syntax; tsc only typechecks.
+	"include": ["core/**/*.ts", "*.config.js"],
+	"exclude": ["node_modules"]
+}

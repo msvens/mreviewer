@@ -29,9 +29,10 @@ to the full runbook. Follow the phases in order; each ends with a gate.
 
 ## Open design issue: CLAUDE.md isolation
 
-Claude Code loads `CLAUDE.md` files from the working directory *and its parents*. If `core` spawns
+Claude Code loads `CLAUDE.md` files from the working directory _and its parents_. If `core` spawns
 `claude -p` with cwd `agent/`, this file is loaded too and pollutes the reviewer persona. Resolve
 this in phase 1, for example by:
+
 - spawning from a directory outside the repo (such as `$MREVIEWER_HOME/state/run/`) and pointing
   Claude Code at `agent/`'s settings and skills, or
 - packaging `agent/` as a Claude Code plugin.
