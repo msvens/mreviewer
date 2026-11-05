@@ -27,14 +27,23 @@ to the full runbook. Follow the phases in order; each ends with a gate.
 - The CLI calls `core` directly, not the UI's HTTP API.
 - `core` spawns `claude -p` for reviews with `GH_TOKEN` set to the reviewer's fine-grained PAT.
 
-## Open design issue: CLAUDE.md isolation
+## Agent isolation (resolved in phase 0)
 
-Claude Code loads `CLAUDE.md` files from the working directory _and its parents_. If `core` spawns
-`claude -p` with cwd `agent/`, this file is loaded too and pollutes the reviewer persona. Resolve
-this in phase 1, for example by:
+`core` starts the agent as `claude -p --restricted` (`core/src/agent/launch.ts`). Verified with
+real runs on Claude Code 2.1.318:
 
-- spawning from a directory outside the repo (such as `$MREVIEWER_HOME/state/run/`) and pointing
-  Claude Code at `agent/`'s settings and skills, or
-- packaging `agent/` as a Claude Code plugin.
+- `--restricted` ignores user, project and local settings, every `CLAUDE.md` (this file and
+  `~/.claude/CLAUDE.md` included) and ambient MCP servers. The run sees only:
+  - the per-run `--settings` file built by `core/src/agent/settings.ts`;
+  - `agent/` loaded as a plugin (`--plugin-dir`), so the skills are `/mreviewer:review-pr` etc.;
+  - the persona file (`--append-system-prompt-file`): `agent/persona.md` plus the instance's
+    approved `config/` knowledge.
+- `--add-dir` is never used: it would load `.claude/skills` from a PR's worktree. File access goes
+  through `permissions.additionalDirectories` instead.
+- The run directory is `$MREVIEWER_HOME/state/run/<id>/`, outside this repo.
+- `core` strips `ANTHROPIC_*` from the agent's environment (an API key beats the subscription in
+  `-p` mode) and stops any run whose init event reports an API key.
 
-Check the current Claude Code docs for the right flags before choosing.
+`pnpm test:integration` (`core/__tests__/lockdown.integration.test.ts`) is the proof. Rerun it
+after changing the agent's settings, permissions, flags or environment, and after Claude Code
+upgrades.
