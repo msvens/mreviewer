@@ -25,7 +25,7 @@ Nothing reaches `config/` without your approval.
 ## Layout
 
 ```
-agent/        runtime agent: CLAUDE.md (reviewer persona), .claude/ (skills, settings)
+agent/        runtime agent: a Claude Code plugin (skills/), persona.md, permissions.json
 core/         TypeScript orchestration library
 cli/          mreviewer command line
 ui/           SvelteKit local web UI (imports core)
