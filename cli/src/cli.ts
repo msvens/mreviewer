@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 import {
 	ConfigError,
+	describeChecks,
 	LockBusyError,
 	PrRefError,
 	type ReviewOptions,
@@ -33,6 +34,7 @@ export function summarize(r: ReviewResult): string[] {
 	const lines = [
 		`${r.ref} reviewed with ${r.model}`,
 		`  draft:   ${r.draftExists ? r.draftPath : '(none written)'}`,
+		`  checks:  ${describeChecks(r.checks)}`,
 		`  turns:   ${res?.numTurns ?? '?'}   duration: ${res?.durationMs ? `${Math.round(res.durationMs / 1000)}s` : '?'}`,
 		`  record:  ${r.recordPath}`
 	];

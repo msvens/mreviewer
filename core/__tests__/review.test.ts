@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { GitHub, PrDetails } from '../src/github.ts';
 import { instancePaths } from '../src/home.ts';
+import type { SandboxExecutor } from '../src/checks/sandbox.ts';
 import { acquireRunLock, LockBusyError } from '../src/lock.ts';
 import { reviewPr } from '../src/review.ts';
 import { createGitFixture, type GitFixture, sh } from './helpers/git-fixture.ts';
@@ -94,6 +95,11 @@ describe('reviewPr', () => {
 		expect(seen.prompt).toContain(`Base: main (merge-base ${fx.baseSha})`);
 		expect(seen.prompt).toContain('Max nits: 2');
 		expect(seen.prompt).toContain('Model: test-model');
+		expect(seen.prompt).toMatch(/^Check results: .*\/checks\/checks\.json$/m);
+		expect(r.checks).toMatchObject({
+			ran: false,
+			reason: expect.stringMatching(/run_checks is off/)
+		});
 		// The agent has no GitHub token; it reads what core prefetched.
 		expect(seen.hasToken).toBe(false);
 		expect(seen.description).toBe('Adds line two.\n');
@@ -121,6 +127,30 @@ describe('reviewPr', () => {
 			numTurns: 4,
 			apiKeySource: 'none'
 		});
+	});
+
+	it('runs the checks on the PR head before the agent when the repo opts in', async () => {
+		await writeFile(
+			paths.config.configYaml,
+			`projects_root: ${fx.root}\nrepos:\n  - name: o/local\n    path: local\n    stack: ts\n    run_checks: true\n    trusted_authors: [someone]\n    toolchain: pnpm\n    checks:\n      - name: test\n        run: pnpm run test\n`
+		);
+		const seenCwd: string[] = [];
+		const sandbox = async (): Promise<SandboxExecutor> => ({
+			exec: async (req) => {
+				seenCwd.push(req.cwd);
+				return { exitCode: 0, timedOut: false, durationMs: 1, tail: '' };
+			},
+			dispose: async () => undefined
+		});
+		const r = await run('draft', { checkSandbox: sandbox });
+		expect(seenCwd).toEqual([r.worktreePath, r.worktreePath]);
+		expect(r.checks.checks).toMatchObject([{ name: 'test', status: 'passed' }]);
+		const record = JSON.parse(await readFile(r.recordPath, 'utf8'));
+		expect(record).toMatchObject({
+			checks: '1 passed',
+			checkStatuses: { install: 'passed', test: 'passed' }
+		});
+		expect(existsSync(r.worktreePath)).toBe(false);
 	});
 
 	it('logs permission denials to state/logs/denied.jsonl', async () => {
