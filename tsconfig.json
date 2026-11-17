@@ -19,6 +19,6 @@
 	},
 	// Node 24 runs .ts directly (type stripping), so code imports with .ts extensions and uses only
 	// erasable syntax; tsc only typechecks.
-	"include": ["core/**/*.ts", "*.config.js"],
+	"include": ["core/**/*.ts", "cli/**/*.ts", "*.config.js"],
 	"exclude": ["node_modules"]
 }

@@ -1,0 +1,12 @@
+{
+	"name": "@mreviewer/cli",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"bin": {
+		"mreviewer": "./src/main.ts"
+	},
+	"dependencies": {
+		"@mreviewer/core": "workspace:*"
+	}
+}
