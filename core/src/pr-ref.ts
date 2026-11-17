@@ -20,7 +20,7 @@ const URL_FORM =
 export function parsePrRef(input: string): PrRef {
 	const m = SHORT.exec(input.trim()) ?? URL_FORM.exec(input.trim());
 	const number = Number(m?.[3]);
-	if (!m || !m[1] || !m[2] || !Number.isSafeInteger(number) || number < 1) {
+	if (!m || !m[1] || !m[2] || !Number.isSafeInteger(number) || number < 0) {
 		throw new PrRefError(input);
 	}
 	return { owner: m[1], repo: m[2], number };
