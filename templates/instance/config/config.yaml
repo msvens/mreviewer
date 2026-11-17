@@ -7,6 +7,9 @@ poll_interval_minutes: 15
 quiet_hours: '22:00-08:00'
 
 review:
+  model: claude-opus-5-5 # model for reviews
+  max_turns: 80 # agent turns per review
+  timeout_minutes: 30 # a run is stopped after this
   review_event: comment # comment only for now (PAT cannot request changes on own PRs)
   max_nits: 3
   auto_post: false # drafts need approval
