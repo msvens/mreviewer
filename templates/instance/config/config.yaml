@@ -12,6 +12,7 @@ review:
   timeout_minutes: 30 # a run is stopped after this
   review_event: comment # comment only for now (PAT cannot request changes on own PRs)
   max_nits: 3
+  check_timeout_minutes: 10 # per check command, install included
   auto_post: false # drafts need approval
 
 notify: macos # macos | none
@@ -22,4 +23,21 @@ repos:
     stack: sveltekit
     role: active # active | maintained | stale
     authority: true # a source of conventions
-    run_checks: true # run typecheck/tests on the PR head
+    # Checks: core installs dependencies and runs the checks on the PR head in a sandbox before the
+    # review. Install may reach the package registry only; checks get no network at all.
+    run_checks: true # opt in per repo
+    # trusted_authors: [owner] # whose PRs may run code (default: the repo owner)
+    # toolchain: pnpm # pnpm | go; detected from the lockfile when omitted
+    # checks: # default: the typecheck, check:svelte, lint and test scripts that exist
+    #   - name: typecheck
+    #     run: pnpm run check:svelte
+    #   - name: test
+    #     run: pnpm run test
+
+  - name: owner/example-service
+    path: github.com/owner/example-service
+    stack: go
+    role: active
+    run_checks: true # go vet, go test, and golangci-lint when the repo configures it
+    # Tests that need a local database: lets checks connect to any port on localhost.
+    allow_localhost: false
