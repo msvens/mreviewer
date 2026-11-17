@@ -23,7 +23,14 @@ describe('parseConfig', () => {
 			max_nits: 3,
 			auto_post: false
 		});
-		expect(c.repos[0]).toMatchObject({ role: 'active', authority: false, run_checks: false });
+		expect(c.repos[0]).toMatchObject({
+			role: 'active',
+			authority: false,
+			run_checks: false,
+			allow_localhost: false
+		});
+		expect(c.repos[0]?.trusted_authors).toBeUndefined();
+		expect(c.review.check_timeout_minutes).toBe(10);
 		expect(c.scheduler).toBe('launchd');
 	});
 
@@ -45,6 +52,25 @@ describe('parseConfig', () => {
 			parseConfig('projects_root: x\nrepos:\n  - name: not-a-repo\n    path: p\n    stack: go\n')
 		).toThrow(/repos\.0\.name/);
 		expect(() => parseConfig('repos: [')).toThrow(/invalid YAML/);
+	});
+
+	it('parses check settings and rejects unknown toolchains and bad check names', () => {
+		const withChecks = (extra: string) =>
+			parseConfig(`${minimal}    run_checks: true\n${extra}`).repos[0];
+		expect(
+			withChecks(
+				'    toolchain: pnpm\n    trusted_authors: [msvens]\n    checks:\n      - name: check:svelte\n        run: pnpm run check:svelte\n'
+			)
+		).toMatchObject({
+			run_checks: true,
+			toolchain: 'pnpm',
+			trusted_authors: ['msvens'],
+			checks: [{ name: 'check:svelte', run: 'pnpm run check:svelte' }]
+		});
+		expect(() => withChecks('    toolchain: cargo\n')).toThrow(/repos\.0\.toolchain.*pnpm, go/s);
+		expect(() => withChecks('    checks:\n      - name: ../x\n        run: x\n')).toThrow(
+			/repos\.0\.checks\.0\.name/
+		);
 	});
 });
 

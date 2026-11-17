@@ -13,6 +13,8 @@ The prompt gives you:
 - **GitHub data** that core fetched for you, as files: PR data (title, author, files, commits,
   linked issue numbers), linked issues, discussion (comments and reviews), checks (CI status), and
   the **PR description** in a file of its own;
+- **Check results**: `checks.json` from the checks core ran on the PR head before you started
+  (install, typecheck, lint, tests), with one log file per step;
 - **Draft**: the file to write the review to; **Notes**: a scratch file for your working notes;
 - **Max nits**: how many nits the review may contain; **Model**: your model id, for the draft header.
 
@@ -55,8 +57,23 @@ Do not read the PR description yet.
 
 ## 3. Checks
 
-Typecheck, lint and tests on the PR head are not run yet. Do not try to run them. List them under
-"Not run" in the review.
+core already ran the repo's checks on the PR head, in a sandbox, before you started. You cannot
+run them yourself. Read the **Check results** file:
+
+- `ran: false` means nothing ran; `reason` says why (repo not opted in, author not trusted, no
+  supported toolchain). Put that under "Not run".
+- `setup` is the dependency download and install, `checks` the check commands. Each has a
+  `status` (`passed`, `failed`, `timed-out`, `skipped` with a `reason`), the `command`, a `tail`
+  of the output and the full `log` file. Read the log of every step that did not pass.
+- Checks run with no network (and no localhost unless `sandbox.localhost` is true). A failure that
+  comes from the sandbox (`operation not permitted`, connection refused, DNS errors) is an
+  environment problem, not a finding; say so under "Not run" or "Checked and ran".
+- A failure can predate the PR. Compare with the GitHub **checks** file (CI on this head) and with
+  the diff: does the failing code or test touch what the PR changed?
+- A failing check is a finding only with evidence from the log: the error and where it points.
+- `restoredFiles` lists tracked files the checks modified; core put them back before you ran.
+- `dependencyDirs` lists installed dependency sources (`node_modules`, the Go module cache). Read
+  them when you need to know how a library behaves.
 
 ## 4. Conventions
 
@@ -100,10 +117,11 @@ Fix sketch: <short, optional>
 Verify: <command or check that proves the fix>
 
 ## Checked and ran
+- <checks core ran, with their result: "pnpm run test: passed (1431 tests)">
 - <what you read and checked, commands you ran>
 
 ## Not run
-- Typecheck, lint, tests: not available to the reviewer yet.
+- <checks that were skipped or could not run, with the reason; omit the section if none>
 ```
 
 Rules:

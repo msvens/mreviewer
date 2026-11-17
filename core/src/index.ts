@@ -22,6 +22,30 @@ export {
 	StreamCollector
 } from './agent/stream.ts';
 export { readToken, TOKEN_SERVICE, TokenNotFoundError } from './agent/token.ts';
+export {
+	type ExecRequest,
+	type ExecResult,
+	type Executor,
+	hostExecutor,
+	type SandboxPolicy
+} from './checks/exec.ts';
+export {
+	type ChecksSummary,
+	checksGate,
+	describeChecks,
+	type GateDecision,
+	runChecks,
+	type StepResult,
+	type StepStatus
+} from './checks/run.ts';
+export { type SandboxExecutor, srtExecutor } from './checks/sandbox.ts';
+export {
+	type CheckSpec,
+	detectToolchain,
+	type Toolchain,
+	TOOLCHAINS,
+	toolchainById
+} from './checks/toolchains/index.ts';
 export { AGENT_DIR, ENGINE_ROOT } from './engine.ts';
 export {
 	DEFAULT_HOME_DIRNAME,

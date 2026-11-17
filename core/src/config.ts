@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { isAbsolute, join, resolve } from 'node:path';
 import { parse } from 'yaml';
 import { z } from 'zod';
+import { TOOLCHAIN_IDS } from './checks/toolchains/index.ts';
 import type { InstancePaths } from './home.ts';
 
 export const DEFAULT_MODEL = 'claude-opus-5-5';
@@ -16,8 +17,29 @@ const repoSchema = z.strictObject({
 	role: z.enum(['active', 'maintained', 'stale']).default('active'),
 	/** A source of conventions. */
 	authority: z.boolean().default(false),
-	/** Run typecheck/tests on the PR head (phase 1, item B). */
-	run_checks: z.boolean().default(false)
+	/** Run install, typecheck, lint and tests on the PR head, in the sandbox. */
+	run_checks: z.boolean().default(false),
+	/** GitHub logins whose PRs may run checks. Default: the repo owner. */
+	trusted_authors: z.array(z.string().min(1)).optional(),
+	/** Package manager; detected from the lockfile when omitted. */
+	toolchain: z
+		.string()
+		.refine((id) => TOOLCHAIN_IDS.includes(id), `must be one of: ${TOOLCHAIN_IDS.join(', ')}`)
+		.optional(),
+	/** Check commands; the toolchain's defaults when omitted. Run with no network. */
+	checks: z
+		.array(
+			z.strictObject({
+				name: z.string().regex(/^[\w.:-]+$/, 'letters, digits and . _ : - only'),
+				run: z.string().min(1)
+			})
+		)
+		.optional(),
+	/**
+	 * Let checks connect to any port on localhost, e.g. a local test database. Everything listening
+	 * on localhost becomes reachable from PR code, so keep it off unless the tests need it.
+	 */
+	allow_localhost: z.boolean().default(false)
 });
 
 const reviewSchema = z.strictObject({
@@ -27,6 +49,8 @@ const reviewSchema = z.strictObject({
 	/** Only Comment reviews are possible with a PAT on your own PRs. */
 	review_event: z.enum(['comment']).default('comment'),
 	max_nits: z.number().int().min(0).default(3),
+	/** Per check command, install included. */
+	check_timeout_minutes: z.number().positive().default(10),
 	auto_post: z.boolean().default(false)
 });
 

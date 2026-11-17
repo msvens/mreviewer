@@ -4,6 +4,9 @@ import { appendFile, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { launchAgent, type RunOutcome } from './agent/launch.ts';
 import { readToken } from './agent/token.ts';
+import type { Executor } from './checks/exec.ts';
+import { type ChecksSummary, describeChecks, runChecks } from './checks/run.ts';
+import type { SandboxExecutor } from './checks/sandbox.ts';
 import { findRepo, loadConfig } from './config.ts';
 import { type GitHub, ghGitHub, type PrDetails } from './github.ts';
 import { type InstancePaths, instancePaths, resolveHome } from './home.ts';
@@ -24,6 +27,8 @@ export interface ReviewOptions {
 	claudeBin?: string;
 	env?: NodeJS.ProcessEnv;
 	signal?: AbortSignal;
+	checkSandbox?: () => Promise<SandboxExecutor>;
+	checkHostExec?: Executor;
 }
 
 export interface ReviewResult {
@@ -33,6 +38,7 @@ export interface ReviewResult {
 	recordPath: string;
 	worktreePath: string;
 	model: string;
+	checks: ChecksSummary;
 	outcome: RunOutcome;
 }
 
@@ -41,6 +47,7 @@ export interface PromptInput {
 	pr: PrDetails;
 	wt: PrWorktree;
 	gh: GitHubContext;
+	checksPath: string;
 	draftPath: string;
 	maxNits: number;
 	model: string;
@@ -52,6 +59,7 @@ export function buildReviewPrompt({
 	pr,
 	wt,
 	gh,
+	checksPath,
 	draftPath,
 	maxNits,
 	model
@@ -68,6 +76,7 @@ export function buildReviewPrompt({
 		`GitHub discussion: ${gh.discussion}`,
 		`GitHub checks: ${gh.checks}`,
 		`PR description (read last): ${gh.description}`,
+		`Check results: ${checksPath}`,
 		`Draft: ${draftPath}`,
 		`Notes: ${draftPath.replace(/\.md$/, '.notes.md')}`,
 		`Max nits: ${maxNits}`,
@@ -100,7 +109,11 @@ async function logRun(
 		numTurns: outcome.result?.numTurns,
 		durationMs: outcome.result?.durationMs,
 		costUsd: outcome.result?.costUsd,
-		permissionDenials: outcome.result?.permissionDenials.length ?? 0
+		permissionDenials: outcome.result?.permissionDenials.length ?? 0,
+		checks: describeChecks(result.checks),
+		checkStatuses: Object.fromEntries(
+			[...result.checks.setup, ...result.checks.checks].map((c) => [c.name, c.status])
+		)
 	};
 	await writeFile(recordPath, `${JSON.stringify(record, null, '\t')}\n`);
 
@@ -118,8 +131,8 @@ async function logRun(
 
 /**
  * Review one PR end to end: lock, fetch the PR's GitHub data, check out the PR head as a detached
- * worktree, run the agent's review-pr skill, remove the worktree, log the run. The draft lands in
- * state/drafts/.
+ * worktree, run the repo's checks on it in the sandbox (if allowed), run the agent's review-pr
+ * skill, remove the worktree, log the run. The draft lands in state/drafts/.
  *
  * All GitHub access happens here, in core, with the reviewer token. The agent gets no token: `gh`
  * cannot verify TLS inside the macOS sandbox anyway, and a token-less agent can only write drafts.
@@ -154,15 +167,32 @@ export async function reviewPr(input: string, opts: ReviewOptions = {}): Promise
 		);
 		await mkdir(paths.state.drafts, { recursive: true });
 		let outcome: RunOutcome;
+		let checks: ChecksSummary;
 		try {
 			const runId = `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
-			const gh = await writeGitHubContext(join(paths.state.run, runId, 'github'), pr, github);
+			const runDir = join(paths.state.run, runId);
+			const gh = await writeGitHubContext(join(runDir, 'github'), pr, github);
+			const checked = await runChecks({
+				repo,
+				author: pr.author,
+				owner: ref.owner,
+				worktree: wt.path,
+				runDir,
+				paths,
+				timeoutMs: config.review.check_timeout_minutes * 60_000,
+				...(opts.env && { env: opts.env }),
+				...(opts.signal && { signal: opts.signal }),
+				...(opts.checkSandbox && { sandbox: opts.checkSandbox }),
+				...(opts.checkHostExec && { hostExec: opts.checkHostExec })
+			});
+			checks = checked.summary;
 			outcome = await launchAgent({
 				prompt: buildReviewPrompt({
 					ref,
 					pr,
 					wt,
 					gh,
+					checksPath: checked.path,
 					draftPath,
 					maxNits: config.review.max_nits,
 					model
@@ -186,6 +216,7 @@ export async function reviewPr(input: string, opts: ReviewOptions = {}): Promise
 			draftExists: existsSync(draftPath),
 			worktreePath: wt.path,
 			model,
+			checks,
 			outcome
 		};
 		const recordPath = await logRun(paths, label, result);

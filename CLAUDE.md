@@ -49,3 +49,23 @@ real runs on Claude Code 2.1.318:
 `pnpm test:integration` (`core/__tests__/lockdown.integration.test.ts`) is the proof. Rerun it
 after changing the agent's settings, permissions, flags or environment, and after Claude Code
 upgrades.
+
+## Checks on the PR head (phase 1, item B)
+
+`core` runs install, typecheck, lint and tests itself, before the agent starts
+(`core/src/checks/`), under Anthropic's sandbox runtime (`@anthropic-ai/sandbox-runtime`, the same
+Seatbelt engine as Claude Code; pinned version). The agent only reads `checks.json` and the logs.
+
+- Only when the repo has `run_checks: true` and the PR author is in `trusted_authors` (default:
+  the repo owner). Everyone else gets a static review.
+- Writes: the worktree, `state/cache/<toolchain>/` and the run's `checks/tmp` only. Reads: all but
+  the secret paths. Network: the install step reaches the toolchain's registries; checks get none
+  (`allow_localhost` per repo for local test databases).
+- Each package manager is an adapter in `core/src/checks/toolchains/`. A `prefetch` step runs on
+  the host and must only download (Go: `go mod download` with `GOTOOLCHAIN=local`), because Go
+  cannot verify TLS inside the sandbox.
+- Tracked files the checks modify are restored before the agent runs.
+- The sandbox proxy runs in core's process: spawn sandboxed commands asynchronously, never with
+  `spawnSync`, or their network requests hang.
+
+`core/__tests__/checks.lockdown.integration.test.ts` is the proof for this layer.

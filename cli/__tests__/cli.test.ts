@@ -16,6 +16,18 @@ const result = (overrides: Partial<ReviewResult> = {}): ReviewResult => ({
 	recordPath: '/i/state/logs/runs/r.json',
 	worktreePath: '/i/state/worktrees/b-1-abc1234',
 	model: 'claude-opus-5-5',
+	checks: {
+		ran: true,
+		toolchain: 'pnpm',
+		setup: [{ name: 'install', phase: 'install', command: 'pnpm install', status: 'passed' }],
+		checks: [
+			{ name: 'typecheck', phase: 'check', command: 'pnpm run typecheck', status: 'passed' },
+			{ name: 'test', phase: 'check', command: 'pnpm run test', status: 'failed' }
+		],
+		dependencyDirs: [],
+		restoredFiles: [],
+		sandbox: { network: 'none', localhost: false }
+	},
 	outcome: {
 		runId: 'r',
 		runDir: '/i/state/run/r',
@@ -58,6 +70,7 @@ describe('mreviewer CLI', () => {
 		expect(call).toEqual(['a/b#1', { model: 'm', keepWorktree: true }]);
 		expect(c.out.join('\n')).toContain('draft:   /i/state/drafts/b-1-abc1234.md');
 		expect(c.out.join('\n')).toContain('duration: 95s');
+		expect(c.out.join('\n')).toContain('checks:  1 passed, 1 failed');
 	});
 
 	it('exits non-zero and says why when no draft was written', async () => {

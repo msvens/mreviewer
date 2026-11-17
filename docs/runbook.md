@@ -12,6 +12,8 @@ That doc is the source of truth while the design settles. Key decisions, for qui
 | Instance zones | `config/` approved by the user, read-only to the agent; `state/` agent-written                 |
 | Repos          | Reviewed in place via detached worktrees, created and removed by core; never cloned            |
 | Agent sandbox  | `claude -p --restricted`, agent as plugin, macOS sandbox: writes only to `state/`, GitHub only |
+| Checks         | Run by core before the agent, under Anthropic's sandbox runtime; own PRs, per-repo opt-in      |
+| Toolchains     | One adapter per package manager (pnpm, go); Go modules downloaded on the host, never run there |
 | GitHub auth    | One fine-grained PAT on all your repos (Comment reviews only); GitHub App in phase 5           |
 | Language       | TypeScript for core, CLI and UI                                                                |
 | UI             | SvelteKit on 127.0.0.1, imports core, optional                                                 |
