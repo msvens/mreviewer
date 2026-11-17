@@ -7,12 +7,13 @@ import { readToken } from './agent/token.ts';
 import type { Executor } from './checks/exec.ts';
 import { type ChecksSummary, describeChecks, runChecks } from './checks/run.ts';
 import type { SandboxExecutor } from './checks/sandbox.ts';
-import { findRepo, loadConfig } from './config.ts';
+import { findRepo, loadConfig, postMode } from './config.ts';
 import { type GitHub, ghGitHub, type PrDetails } from './github.ts';
 import { type InstancePaths, instancePaths, resolveHome } from './home.ts';
 import { acquireRunLock } from './lock.ts';
 import { formatPrRef, type PrRef, parsePrRef, repoName } from './pr-ref.ts';
 import { type GitHubContext, writeGitHubContext } from './prefetch.ts';
+import { preparePost, sendPost } from './post/post.ts';
 import { type PrWorktree, preparePrWorktree, removePrWorktree } from './worktree.ts';
 
 export interface ReviewOptions {
@@ -31,6 +32,13 @@ export interface ReviewOptions {
 	checkHostExec?: Executor;
 }
 
+/** What happened to the draft after the run. */
+export type PostStatus =
+	| { status: 'posted'; url: string }
+	| { status: 'awaiting-approval'; reason: string }
+	| { status: 'not-posted'; reason: string }
+	| { status: 'failed'; error: string };
+
 export interface ReviewResult {
 	ref: string;
 	draftPath: string;
@@ -40,6 +48,7 @@ export interface ReviewResult {
 	model: string;
 	checks: ChecksSummary;
 	outcome: RunOutcome;
+	post: PostStatus;
 }
 
 export interface PromptInput {
@@ -111,6 +120,7 @@ async function logRun(
 		costUsd: outcome.result?.costUsd,
 		permissionDenials: outcome.result?.permissionDenials.length ?? 0,
 		checks: describeChecks(result.checks),
+		post: result.post,
 		checkStatuses: Object.fromEntries(
 			[...result.checks.setup, ...result.checks.checks].map((c) => [c.name, c.status])
 		)
@@ -132,7 +142,8 @@ async function logRun(
 /**
  * Review one PR end to end: lock, fetch the PR's GitHub data, check out the PR head as a detached
  * worktree, run the repo's checks on it in the sandbox (if allowed), run the agent's review-pr
- * skill, remove the worktree, log the run. The draft lands in state/drafts/.
+ * skill, remove the worktree, post the draft if the repo has auto_post (trusted authors only),
+ * log the run. The draft lands in state/drafts/.
  *
  * All GitHub access happens here, in core, with the reviewer token. The agent gets no token: `gh`
  * cannot verify TLS inside the macOS sandbox anyway, and a token-less agent can only write drafts.
@@ -210,14 +221,32 @@ export async function reviewPr(input: string, opts: ReviewOptions = {}): Promise
 			if (!opts.keepWorktree) await removePrWorktree(wt);
 		}
 
+		const draftExists = existsSync(draftPath);
+		const clean = draftExists && outcome.exitCode === 0 && !outcome.result?.isError;
+		const mode = postMode(config, repo, pr.author, ref.owner);
+		let post: PostStatus;
+		if (!clean) post = { status: 'not-posted', reason: 'the run did not finish cleanly' };
+		else if (mode.mode === 'approve') post = { status: 'awaiting-approval', reason: mode.reason };
+		else {
+			// auto_post: post now, under the lock this run already holds. A failed post keeps the
+			// draft for `mreviewer post` and never fails the review.
+			try {
+				const prepared = await preparePost(draftPath, github, config.review.post_prefix);
+				post = { status: 'posted', url: (await sendPost(prepared, github)).url };
+			} catch (err) {
+				post = { status: 'failed', error: (err as Error).message };
+			}
+		}
+
 		const result = {
 			ref: label,
 			draftPath,
-			draftExists: existsSync(draftPath),
+			draftExists,
 			worktreePath: wt.path,
 			model,
 			checks,
-			outcome
+			outcome,
+			post
 		};
 		const recordPath = await logRun(paths, label, result);
 		return { ...result, recordPath };
