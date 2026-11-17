@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { type GitHub, toPrDetails } from '../src/github.ts';
+import { type GitHub, toPrDetails, toPrFiles } from '../src/github.ts';
 import { writeGitHubContext } from '../src/prefetch.ts';
 
 /** A trimmed `gh pr view --json …` response. */
@@ -64,6 +64,20 @@ describe('toPrDetails', () => {
 	});
 });
 
+describe('toPrFiles', () => {
+	it('keeps the new path and the patch, which binary files lack', () => {
+		expect(
+			toPrFiles([
+				{ filename: 'src/b.ts', status: 'renamed', previous_filename: 'src/a.ts', patch: '@@' },
+				{ filename: 'img.png', status: 'added' }
+			])
+		).toEqual([
+			{ path: 'src/b.ts', status: 'renamed', patch: '@@' },
+			{ path: 'img.png', status: 'added' }
+		]);
+	});
+});
+
 describe('writeGitHubContext', () => {
 	it('writes the PR data without the description, which gets its own file', async () => {
 		const dir = await mkdtemp(join(tmpdir(), 'mreviewer-gh-'));
@@ -73,7 +87,9 @@ describe('writeGitHubContext', () => {
 			issue: async (ref) => {
 				if (ref.number === 12) throw new Error('HTTP 404: Not Found\nmore');
 				return { ...ref, title: 'T', body: 'B', state: 'OPEN', url: 'u' };
-			}
+			},
+			prFiles: async () => [],
+			postReview: async () => ({ id: 1, url: '' })
 		};
 		const ctx = await writeGitHubContext(join(dir, 'github'), pr, github);
 

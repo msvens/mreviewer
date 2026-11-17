@@ -3,7 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { stripSecretEnv } from '../agent/env.ts';
 import { SECRET_READ_PATHS } from '../agent/settings.ts';
-import type { ResolvedRepo } from '../config.ts';
+import { isTrustedAuthor, type ResolvedRepo } from '../config.ts';
 import { git } from '../git.ts';
 import type { InstancePaths } from '../home.ts';
 import { type Executor, hostExecutor, type SandboxPolicy } from './exec.ts';
@@ -73,11 +73,11 @@ export type GateDecision = { run: true } | { run: false; reason: string };
 /** Whether PR code may run: the repo opted in and the author is trusted. */
 export function checksGate(repo: ResolvedRepo, author: string, owner: string): GateDecision {
 	if (!repo.run_checks) return { run: false, reason: `run_checks is off for ${repo.name}` };
-	const trusted = (repo.trusted_authors ?? [owner]).map((a) => a.toLowerCase());
-	if (!trusted.includes(author.toLowerCase())) {
+	if (!isTrustedAuthor(repo, author, owner)) {
+		const trusted = (repo.trusted_authors ?? [owner]).join(', ');
 		return {
 			run: false,
-			reason: `PR author ${author} is not in trusted_authors (${trusted.join(', ')}); PR code is not run`
+			reason: `PR author ${author} is not in trusted_authors (${trusted}); PR code is not run`
 		};
 	}
 	return { run: true };
