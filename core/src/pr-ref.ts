@@ -26,5 +26,5 @@ export function parsePrRef(input: string): PrRef {
 	return { owner: m[1], repo: m[2], number };
 }
 
-export const formatPrRef = (r: PrRef) => `${r.owner}/${r.repo}#${r.number}`;
+export const formatPrRef = (r: PrRef) => `${r.repo}#${r.number}`;
 export const repoName = (r: PrRef) => `${r.owner}/${r.repo}`;
