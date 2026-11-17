@@ -1,14 +1,9 @@
 {
-	"$comment": "Command rules for the runtime agent. core merges these into the per-run settings file (core/src/agent/settings.ts). Anything not allowed is denied (dontAsk mode); the deny list is a second line for commands that must never run, even if a broader allow is added later.",
+	"$comment": "Command rules for the runtime agent. core merges these into the per-run settings file (core/src/agent/settings.ts). Anything not allowed is denied (dontAsk mode); the deny list is a second line for commands that must never run, even if a broader allow is added later. The agent has no GitHub access: core prefetches PR data into the run directory, so every gh command is denied.",
 	"allow": [
 		"Read",
 		"Grep",
 		"Glob",
-		"Bash(gh pr view *)",
-		"Bash(gh pr diff *)",
-		"Bash(gh pr list *)",
-		"Bash(gh pr checks *)",
-		"Bash(gh issue view *)",
 		"Bash(git log *)",
 		"Bash(git show *)",
 		"Bash(git diff *)",
@@ -21,6 +16,7 @@
 		"Bash(git -C * blame *)"
 	],
 	"deny": [
+		"Bash(gh *)",
 		"Bash(git push *)",
 		"Bash(git * push *)",
 		"Bash(git commit *)",
@@ -41,15 +37,10 @@
 		"Bash(git * worktree *)",
 		"Bash(git config *)",
 		"Bash(git * config *)",
-		"Bash(gh pr merge *)",
-		"Bash(gh pr close *)",
-		"Bash(gh pr reopen *)",
-		"Bash(gh pr edit *)",
-		"Bash(gh repo *)",
-		"Bash(gh auth *)",
-		"Bash(gh api *)",
 		"Bash(security *)",
 		"Bash(curl *)",
-		"Bash(wget *)"
+		"Bash(wget *)",
+		"Bash(gh api *)",
+		"Bash(gh pr merge *)"
 	]
 }

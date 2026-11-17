@@ -30,3 +30,26 @@ export {
 	instancePaths,
 	resolveHome
 } from './home.ts';
+export {
+	type Config,
+	ConfigError,
+	DEFAULT_MODEL,
+	findRepo,
+	loadConfig,
+	parseConfig,
+	type RepoConfig,
+	type ResolvedRepo
+} from './config.ts';
+export {
+	type GitHub,
+	ghGitHub,
+	type IssueDetails,
+	type IssueRef,
+	type PrDetails,
+	toPrDetails
+} from './github.ts';
+export { type GitHubContext, writeGitHubContext } from './prefetch.ts';
+export { acquireRunLock, LockBusyError } from './lock.ts';
+export { formatPrRef, type PrRef, PrRefError, parsePrRef, repoName } from './pr-ref.ts';
+export { buildReviewPrompt, type ReviewOptions, type ReviewResult, reviewPr } from './review.ts';
+export { type PrWorktree, preparePrWorktree, removePrWorktree } from './worktree.ts';

@@ -83,6 +83,7 @@ describe('agent/permissions.json', () => {
 		const perms = await loadAgentPermissions(AGENT_DIR);
 		expect(perms.deny).toEqual(
 			expect.arrayContaining([
+				'Bash(gh *)',
 				'Bash(git push *)',
 				'Bash(git * push *)',
 				'Bash(git commit *)',
