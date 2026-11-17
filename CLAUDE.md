@@ -69,3 +69,20 @@ Seatbelt engine as Claude Code; pinned version). The agent only reads `checks.js
   `spawnSync`, or their network requests hang.
 
 `core/__tests__/checks.lockdown.integration.test.ts` is the proof for this layer.
+
+## Posting (phase 1, item C)
+
+`core` posts drafts (`core/src/post/`); the agent never does. A posted review is a Comment review
+(a PAT cannot approve or request changes on its own PRs) on the commit the draft reviewed:
+
+- The body is `review.post_prefix` plus the whole draft, so every finding is in it. Findings on
+  lines in the PR diff also get an inline comment, findings elsewhere in a changed file a
+  file-level comment; findings on unchanged files stay in the body only.
+- `mreviewer post <draft | owner/repo#N>` previews and asks first. Posting is refused when the PR
+  has new commits since the review (`--allow-stale`) or the draft was posted before (`--force`);
+  `<draft>.posted.json` records each post.
+- `auto_post` (global in `review:`, overridable per repo; default false) lets `mreviewer review`
+  post straight away, only after a clean run and only for PRs by `trusted_authors`. A failed post
+  never fails the review; the draft stays for `mreviewer post`.
+- Drafts are parsed from the review-pr skill's format: keep the skill's step 7 and
+  `core/src/post/draft.ts` in step.
