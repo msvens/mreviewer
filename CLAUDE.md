@@ -1,7 +1,7 @@
 # mreviewer — development instructions
 
 These instructions are for building this repo. The runtime reviewer persona lives in
-`agent/CLAUDE.md`. Never mix the two.
+`agent/persona.md`. Never mix the two.
 
 ## What this is
 
@@ -25,7 +25,9 @@ to the full runbook. Follow the phases in order; each ends with a gate.
 
 - TypeScript throughout (`core`, `cli`, `ui`). SvelteKit for the UI, which imports `core` directly.
 - The CLI calls `core` directly, not the UI's HTTP API.
-- `core` spawns `claude -p` for reviews with `GH_TOKEN` set to the reviewer's fine-grained PAT.
+- All GitHub access is in `core`, with the reviewer's fine-grained PAT from the Keychain. Before a
+  run, `core` prefetches the PR data into the run directory; the agent gets no token and no `gh`
+  (Go programs cannot verify TLS inside the macOS sandbox).
 
 ## Agent isolation (resolved in phase 0)
 

@@ -1,4 +1,16 @@
 # core
 
-TypeScript orchestration library (phase 3): `poll`, queue + lockfile, `run` (spawns `claude -p`),
-`approve`, `post`, `notify`. Imported by `cli` and `ui`.
+TypeScript orchestration library, imported by `cli` (and later `ui`).
+
+| Module        | What it does                                                                        |
+| ------------- | ----------------------------------------------------------------------------------- |
+| `home.ts`     | Resolve `$MREVIEWER_HOME` and the instance layout                                   |
+| `config.ts`   | Load and validate `config/config.yaml` (yaml + zod)                                 |
+| `pr-ref.ts`   | Parse `owner/repo#N` and PR URLs                                                    |
+| `worktree.ts` | Check out a PR head as a detached worktree; remove it and verify refs are unchanged |
+| `lock.ts`     | `state/run.lock`: one review at a time                                              |
+| `github.ts`   | The few GitHub calls core makes itself, with the reviewer token                     |
+| `review.ts`   | One review end to end: lock, worktree, agent run, cleanup, run record               |
+| `agent/`      | Launch the locked-down agent: settings, environment, persona, token, stream parsing |
+
+Planned (phase 3): `poll`, queue, `approve`, `post`, `notify`.
