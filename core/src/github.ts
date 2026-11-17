@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { PrRef } from './pr-ref.ts';
 
@@ -69,10 +69,38 @@ export interface IssueDetails extends IssueRef {
 	url: string;
 }
 
+/** A changed file with its diff, from the pulls files API. */
+export interface PrFileDiff {
+	path: string;
+	status: string;
+	/** Unified diff hunks; missing for binary or very large files. */
+	patch?: string;
+}
+
+/** A review comment anchored to lines on the PR head side, or to a whole file. */
+export type ReviewComment =
+	| { path: string; line: number; start_line?: number; side: 'RIGHT'; body: string }
+	| { path: string; subject_type: 'file'; body: string };
+
+export interface ReviewPayload {
+	/** The commit the review is about: the head the draft was written for. */
+	commit_id: string;
+	event: 'COMMENT';
+	body: string;
+	comments: ReviewComment[];
+}
+
+export interface PostedReview {
+	id: number;
+	url: string;
+}
+
 /** What core needs from GitHub. Injectable so tests can stub it. */
 export interface GitHub {
 	pr(ref: PrRef): Promise<PrDetails>;
 	issue(ref: IssueRef): Promise<IssueDetails>;
+	prFiles(ref: PrRef): Promise<PrFileDiff[]>;
+	postReview(ref: PrRef, review: ReviewPayload): Promise<PostedReview>;
 }
 
 type Json = Record<string, unknown>;
@@ -154,6 +182,15 @@ export function toPrDetails(pr: Json, ref: PrRef): PrDetails {
 	};
 }
 
+/** Map pulls files API entries to PrFileDiff. Exported for tests. */
+export function toPrFiles(files: Json[]): PrFileDiff[] {
+	return files.map((f) => ({
+		path: str(f.filename),
+		status: str(f.status),
+		...(typeof f.patch === 'string' && { patch: f.patch })
+	}));
+}
+
 /** GitHub via the `gh` CLI, run by core (outside the sandbox) with the reviewer token. */
 export function ghGitHub(token: string): GitHub {
 	const env: NodeJS.ProcessEnv = { ...process.env, GH_TOKEN: token, GH_PROMPT_DISABLED: '1' };
@@ -161,10 +198,26 @@ export function ghGitHub(token: string): GitHub {
 	const gh = async (args: string[]) =>
 		JSON.parse(
 			(await execFileAsync('gh', args, { env, maxBuffer: 64 * 1024 * 1024 })).stdout
-		) as Json;
+		) as unknown;
+	/** gh with a JSON request body on stdin. */
+	const ghInput = (args: string[], input: unknown) =>
+		new Promise<unknown>((resolve, reject) => {
+			const child = spawn('gh', args, { env, stdio: ['pipe', 'pipe', 'pipe'] });
+			let out = '';
+			let err = '';
+			child.stdout.on('data', (d: Buffer) => (out += d.toString()));
+			child.stderr.on('data', (d: Buffer) => (err += d.toString()));
+			child.on('error', reject);
+			child.on('close', (code) => {
+				if (code === 0) resolve(JSON.parse(out));
+				else reject(new Error(`gh ${args.slice(0, 3).join(' ')} failed: ${(err || out).trim()}`));
+			});
+			child.stdin.end(JSON.stringify(input));
+		});
+	const repoPath = (ref: PrRef) => `repos/${ref.owner}/${ref.repo}/pulls/${ref.number}`;
 	return {
 		async pr(ref) {
-			const pr = await gh([
+			const pr = (await gh([
 				'pr',
 				'view',
 				String(ref.number),
@@ -172,11 +225,11 @@ export function ghGitHub(token: string): GitHub {
 				`${ref.owner}/${ref.repo}`,
 				'--json',
 				PR_FIELDS
-			]);
+			])) as Json;
 			return toPrDetails(pr, ref);
 		},
 		async issue(ref) {
-			const i = await gh([
+			const i = (await gh([
 				'issue',
 				'view',
 				String(ref.number),
@@ -184,7 +237,7 @@ export function ghGitHub(token: string): GitHub {
 				`${ref.owner}/${ref.repo}`,
 				'--json',
 				'title,body,state,url'
-			]);
+			])) as Json;
 			return {
 				...ref,
 				title: str(i.title),
@@ -192,6 +245,22 @@ export function ghGitHub(token: string): GitHub {
 				state: str(i.state),
 				url: str(i.url)
 			};
+		},
+		async prFiles(ref) {
+			const pages = (await gh([
+				'api',
+				'--paginate',
+				'--slurp',
+				`${repoPath(ref)}/files?per_page=100`
+			])) as unknown[];
+			return toPrFiles(pages.flatMap((p) => arr(p)));
+		},
+		async postReview(ref, review) {
+			const r = (await ghInput(
+				['api', '-X', 'POST', `${repoPath(ref)}/reviews`, '--input', '-'],
+				review
+			)) as Json;
+			return { id: num(r.id), url: str(r.html_url) };
 		}
 	};
 }

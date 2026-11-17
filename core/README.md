@@ -12,6 +12,7 @@ TypeScript orchestration library, imported by `cli` (and later `ui`).
 | `github.ts`   | The few GitHub calls core makes itself, with the reviewer token                     |
 | `prefetch.ts` | Write the PR's GitHub data into the run directory for the agent                     |
 | `checks/`     | Run install and checks on the PR head in the sandbox; one adapter per toolchain     |
+| `post/`       | Parse a draft, anchor its findings to the PR diff and post it as a Comment review   |
 | `review.ts`   | One review end to end: lock, worktree, checks, agent run, cleanup, run record       |
 | `agent/`      | Launch the locked-down agent: settings, environment, persona, token, stream parsing |
 

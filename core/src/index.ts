@@ -61,12 +61,19 @@ export {
 	findRepo,
 	loadConfig,
 	parseConfig,
+	isTrustedAuthor,
+	type PostMode,
+	postMode,
 	type RepoConfig,
 	type ResolvedRepo
 } from './config.ts';
 export {
 	type GitHub,
 	ghGitHub,
+	type PostedReview,
+	type PrFileDiff,
+	type ReviewComment,
+	type ReviewPayload,
 	type IssueDetails,
 	type IssueRef,
 	type PrDetails,
@@ -75,5 +82,24 @@ export {
 export { type GitHubContext, writeGitHubContext } from './prefetch.ts';
 export { acquireRunLock, LockBusyError } from './lock.ts';
 export { formatPrRef, type PrRef, PrRefError, parsePrRef, repoName } from './pr-ref.ts';
-export { buildReviewPrompt, type ReviewOptions, type ReviewResult, reviewPr } from './review.ts';
+export { type BodyOnly, type BuiltReview, buildReview, diffLines } from './post/build.ts';
+export { type Draft, DraftError, type Finding, type Location, parseDraft } from './post/draft.ts';
+export {
+	PostError,
+	type PostOptions,
+	type PostOutcome,
+	type PostRecord,
+	type PreparedPost,
+	postDraft,
+	preparePost,
+	resolveDraft,
+	sendPost
+} from './post/post.ts';
+export {
+	buildReviewPrompt,
+	type PostStatus,
+	type ReviewOptions,
+	type ReviewResult,
+	reviewPr
+} from './review.ts';
 export { type PrWorktree, preparePrWorktree, removePrWorktree } from './worktree.ts';

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { GitHub, PrDetails } from '../src/github.ts';
+import type { GitHub, PrDetails, ReviewPayload } from '../src/github.ts';
 import { instancePaths } from '../src/home.ts';
 import type { SandboxExecutor } from '../src/checks/sandbox.ts';
 import { acquireRunLock, LockBusyError } from '../src/lock.ts';
@@ -19,7 +19,8 @@ const wt = field('Worktree \\\\(PR head, read-only\\\\)');
 const mode = process.env.FAKE_MODE;
 out({ type: 'system', subtype: 'init', apiKeySource: 'none', tools: [], skills: [], plugins: [] });
 if (mode === 'fail') process.exit(1);
-if (mode !== 'nodraft') fs.writeFileSync(field('Draft'), '# Review\\n' + JSON.stringify({ worktreeExisted: fs.existsSync(wt), prompt, hasToken: 'GH_TOKEN' in process.env, description: fs.readFileSync(field('PR description \\\\(read last\\\\)'), 'utf8'), issues: JSON.parse(fs.readFileSync(field('GitHub linked issues'), 'utf8')) }));
+if (mode === 'gooddraft') fs.writeFileSync(field('Draft'), '# Review: o/local#1 — Add two\\n\\nHead: ' + field('Head sha') + ' · Base: main\\n\\n## Findings\\n\\n### [nit] Two\\nWhere: a.txt:2\\nProblem: p\\n');
+else if (mode !== 'nodraft') fs.writeFileSync(field('Draft'), '# Review\\n' + JSON.stringify({ worktreeExisted: fs.existsSync(wt), prompt, hasToken: 'GH_TOKEN' in process.env, description: fs.readFileSync(field('PR description \\\\(read last\\\\)'), 'utf8'), issues: JSON.parse(fs.readFileSync(field('GitHub linked issues'), 'utf8')) }));
 out({ type: 'result', subtype: 'success', is_error: false, result: 'ok', num_turns: 4, total_cost_usd: 0.01,
   permission_denials: mode === 'denial' ? [{ tool_name: 'Bash', tool_use_id: 't', tool_input: { command: 'git push' } }] : [] });
 `;
@@ -47,8 +48,14 @@ const prDetails = (): PrDetails => ({
 	reviews: [],
 	checks: []
 });
+let posted: ReviewPayload[] = [];
 const github: GitHub = {
 	pr: async () => prDetails(),
+	prFiles: async () => [{ path: 'a.txt', status: 'modified', patch: '@@ -1 +1,2 @@\n one\n+two' }],
+	postReview: async (_ref, review) => {
+		posted.push(review);
+		return { id: 9, url: 'https://github.com/o/local/pull/1#pullrequestreview-9' };
+	},
 	issue: async (ref) => ({
 		...ref,
 		title: 'Need two',
@@ -59,6 +66,7 @@ const github: GitHub = {
 };
 
 beforeEach(async () => {
+	posted = [];
 	fx = await createGitFixture();
 	claudeBin = join(fx.root, 'fake-claude.cjs');
 	await writeFile(claudeBin, FAKE_CLAUDE);
@@ -151,6 +159,61 @@ describe('reviewPr', () => {
 			checkStatuses: { install: 'passed', test: 'passed' }
 		});
 		expect(existsSync(r.worktreePath)).toBe(false);
+	});
+
+	it('leaves the draft for approval by default', async () => {
+		const r = await run('gooddraft');
+		expect(r.post).toEqual({ status: 'awaiting-approval', reason: 'auto_post is off for o/local' });
+		expect(posted).toEqual([]);
+	});
+
+	describe('with auto_post', () => {
+		const autoConfig = (authors = 'someone') =>
+			writeFile(
+				paths.config.configYaml,
+				`projects_root: ${fx.root}\nrepos:\n  - name: o/local\n    path: local\n    stack: ts\n    auto_post: true\n    trusted_authors: [${authors}]\n`
+			);
+
+		it('posts a clean run on the reviewed head and records it', async () => {
+			await autoConfig();
+			const r = await run('gooddraft');
+			expect(r.post).toEqual({
+				status: 'posted',
+				url: 'https://github.com/o/local/pull/1#pullrequestreview-9'
+			});
+			expect(posted[0]).toMatchObject({
+				commit_id: fx.headSha,
+				event: 'COMMENT',
+				comments: [{ path: 'a.txt', line: 2, side: 'RIGHT' }]
+			});
+			expect(existsSync(r.draftPath.replace(/\.md$/, '.posted.json'))).toBe(true);
+			expect(JSON.parse(await readFile(r.recordPath, 'utf8')).post.status).toBe('posted');
+			// Same head again: the draft is already posted, so nothing is sent twice.
+			const again = await run('gooddraft');
+			expect(again.post).toMatchObject({
+				status: 'failed',
+				error: expect.stringMatching(/already posted/)
+			});
+			expect(posted).toHaveLength(1);
+		});
+
+		it('waits for approval when the author is not trusted', async () => {
+			await autoConfig('alice');
+			expect((await run('gooddraft')).post).toMatchObject({ status: 'awaiting-approval' });
+			expect(posted).toEqual([]);
+		});
+
+		it('does not post a failed run, and records a failed post without failing the review', async () => {
+			await autoConfig();
+			expect((await run('fail')).post.status).toBe('not-posted');
+			const r = await run('draft');
+			expect(r.post).toMatchObject({
+				status: 'failed',
+				error: expect.stringMatching(/title line/)
+			});
+			expect(r.draftExists).toBe(true);
+			expect(posted).toEqual([]);
+		});
 	});
 
 	it('logs permission denials to state/logs/denied.jsonl', async () => {

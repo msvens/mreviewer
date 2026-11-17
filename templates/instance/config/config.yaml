@@ -13,7 +13,10 @@ review:
   review_event: comment # comment only for now (PAT cannot request changes on own PRs)
   max_nits: 3
   check_timeout_minutes: 10 # per check command, install included
-  auto_post: false # drafts need approval
+  # Posting: false keeps every draft for approval (`mreviewer post`); true posts a clean review
+  # straight away. Repos can override it, and only PRs by trusted_authors are ever auto-posted.
+  auto_post: false
+  # post_prefix: '🤖 **mreviewer**: automated review, generated with Claude.' # first line of each review
 
 notify: macos # macos | none
 
@@ -26,7 +29,8 @@ repos:
     # Checks: core installs dependencies and runs the checks on the PR head in a sandbox before the
     # review. Install may reach the package registry only; checks get no network at all.
     run_checks: true # opt in per repo
-    # trusted_authors: [owner] # whose PRs may run code (default: the repo owner)
+    # trusted_authors: [owner] # whose PRs may run code and get auto-posted reviews (default: the repo owner)
+    # auto_post: true # post reviews of this repo without approval (default: review.auto_post)
     # toolchain: pnpm # pnpm | go; detected from the lockfile when omitted
     # checks: # default: the typecheck, check:svelte, lint and test scripts that exist
     #   - name: typecheck

@@ -39,7 +39,9 @@ const repoSchema = z.strictObject({
 	 * Let checks connect to any port on localhost, e.g. a local test database. Everything listening
 	 * on localhost becomes reachable from PR code, so keep it off unless the tests need it.
 	 */
-	allow_localhost: z.boolean().default(false)
+	allow_localhost: z.boolean().default(false),
+	/** Post reviews of trusted authors' PRs without approval. Default: review.auto_post. */
+	auto_post: z.boolean().optional()
 });
 
 const reviewSchema = z.strictObject({
@@ -51,7 +53,13 @@ const reviewSchema = z.strictObject({
 	max_nits: z.number().int().min(0).default(3),
 	/** Per check command, install included. */
 	check_timeout_minutes: z.number().positive().default(10),
-	auto_post: z.boolean().default(false)
+	/** Default for repos without their own auto_post: false means every draft needs approval. */
+	auto_post: z.boolean().default(false),
+	/** First line of every posted review and inline comment, so readers know it is automated. */
+	post_prefix: z
+		.string()
+		.min(1)
+		.default('🤖 **mreviewer**: automated review, generated with Claude.')
 });
 
 export const configSchema = z.strictObject({
@@ -130,4 +138,27 @@ export function findRepo(config: Config, name: string, home: string = homedir())
 	const root = resolve(expandHome(config.projects_root, home));
 	const path = expandHome(repo.path, home);
 	return { ...repo, dir: isAbsolute(path) ? resolve(path) : resolve(root, path) };
+}
+
+/** GitHub logins trusted to run code and get auto-posted reviews. Default: the repo owner. */
+export function isTrustedAuthor(repo: RepoConfig, author: string, owner: string): boolean {
+	return (repo.trusted_authors ?? [owner]).some((a) => a.toLowerCase() === author.toLowerCase());
+}
+
+export type PostMode = { mode: 'auto' } | { mode: 'approve'; reason: string };
+
+/** Whether a finished review is posted straight away or waits for approval. */
+export function postMode(
+	config: Config,
+	repo: RepoConfig,
+	author: string,
+	owner: string
+): PostMode {
+	if (!(repo.auto_post ?? config.review.auto_post)) {
+		return { mode: 'approve', reason: `auto_post is off for ${repo.name}` };
+	}
+	if (!isTrustedAuthor(repo, author, owner)) {
+		return { mode: 'approve', reason: `PR author ${author} is not in trusted_authors` };
+	}
+	return { mode: 'auto' };
 }

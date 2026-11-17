@@ -2,7 +2,14 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ConfigError, DEFAULT_MODEL, findRepo, loadConfig, parseConfig } from '../src/config.ts';
+import {
+	ConfigError,
+	DEFAULT_MODEL,
+	findRepo,
+	loadConfig,
+	parseConfig,
+	postMode
+} from '../src/config.ts';
 import { instancePaths } from '../src/home.ts';
 
 const minimal = `
@@ -112,5 +119,37 @@ describe('loadConfig', () => {
 		await mkdir(paths.config.root, { recursive: true });
 		await writeFile(paths.config.configYaml, minimal);
 		expect((await loadConfig(paths)).repos).toHaveLength(1);
+	});
+});
+
+describe('postMode', () => {
+	const config = (global: boolean, repo: string) =>
+		parseConfig(
+			`projects_root: /p\nreview:\n  auto_post: ${global}\nrepos:\n  - name: o/r\n    path: r\n    stack: ts\n${repo}`
+		);
+
+	it('waits for approval unless auto_post is on for the repo, globally or per repo', () => {
+		const off = config(false, '');
+		expect(postMode(off, off.repos[0]!, 'o', 'o')).toEqual({
+			mode: 'approve',
+			reason: 'auto_post is off for o/r'
+		});
+		const global = config(true, '');
+		expect(postMode(global, global.repos[0]!, 'o', 'o')).toEqual({ mode: 'auto' });
+		const repoOff = config(true, '    auto_post: false\n');
+		expect(postMode(repoOff, repoOff.repos[0]!, 'o', 'o').mode).toBe('approve');
+		const repoOn = config(false, '    auto_post: true\n');
+		expect(postMode(repoOn, repoOn.repos[0]!, 'O', 'o').mode).toBe('auto');
+	});
+
+	it('auto-posts only for trusted authors', () => {
+		const c = config(false, '    auto_post: true\n');
+		expect(postMode(c, c.repos[0]!, 'dependabot[bot]', 'o')).toMatchObject({
+			mode: 'approve',
+			reason: expect.stringContaining('not in trusted_authors')
+		});
+		const alice = config(false, '    auto_post: true\n    trusted_authors: [alice]\n');
+		expect(postMode(alice, alice.repos[0]!, 'alice', 'o').mode).toBe('auto');
+		expect(postMode(alice, alice.repos[0]!, 'o', 'o').mode).toBe('approve');
 	});
 });
