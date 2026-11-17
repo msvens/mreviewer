@@ -46,6 +46,8 @@ export interface InstancePaths {
 		logs: string;
 		evals: string;
 		run: string;
+		/** Package caches for checks (pnpm store, Go modules), one directory per toolchain. */
+		cache: string;
 	};
 }
 
@@ -74,7 +76,8 @@ export function instancePaths(root: string): InstancePaths {
 			worktrees: join(state, 'worktrees'),
 			logs: join(state, 'logs'),
 			evals: join(state, 'evals'),
-			run: join(state, 'run')
+			run: join(state, 'run'),
+			cache: join(state, 'cache')
 		}
 	};
 }

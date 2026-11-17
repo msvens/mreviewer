@@ -7,6 +7,7 @@
 		".": "./src/index.ts"
 	},
 	"dependencies": {
+		"@anthropic-ai/sandbox-runtime": "0.0.83",
 		"yaml": "^2.9.1",
 		"zod": "^4.6.7"
 	}

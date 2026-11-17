@@ -26,11 +26,17 @@ const STRIPPED = [
 	/^SSH_AUTH_SOCK$/
 ];
 
-export function buildAgentEnv(parent: NodeJS.ProcessEnv, input: AgentEnvInput): NodeJS.ProcessEnv {
-	const env: NodeJS.ProcessEnv = {};
+/** Copy of `parent` without the variables in STRIPPED. Also used for check commands. */
+export function stripSecretEnv(parent: NodeJS.ProcessEnv): Record<string, string> {
+	const env: Record<string, string> = {};
 	for (const [key, value] of Object.entries(parent)) {
 		if (value !== undefined && !STRIPPED.some((re) => re.test(key))) env[key] = value;
 	}
+	return env;
+}
+
+export function buildAgentEnv(parent: NodeJS.ProcessEnv, input: AgentEnvInput): NodeJS.ProcessEnv {
+	const env: NodeJS.ProcessEnv = stripSecretEnv(parent);
 	env.MREVIEWER_HOME = input.instanceRoot;
 	env.GH_CONFIG_DIR = input.ghConfigDir;
 	env.GH_PROMPT_DISABLED = '1';
