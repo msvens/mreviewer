@@ -46,6 +46,12 @@ real runs on Claude Code 2.1.318:
 - `core` strips `ANTHROPIC_*` from the agent's environment (an API key beats the subscription in
   `-p` mode) and stops any run whose init event reports an API key.
 
+Shell commands follow `agent/permissions.json`: read-only git and read-only text utilities
+(`cat`, `head`, `sed -n`, `grep`, `cd`, …; not `find`), chains and pipes allowed; anything else denied, including a
+whole chain if any part is. Claude Code refuses `cd` followed by git or by an output redirect, and shell variables. Large
+output spills to a file under `~/.claude/projects/`, which the agent cannot read (`~/.claude` is a
+secret path), so the skill asks for small outputs.
+
 `pnpm test:integration` (`core/__tests__/lockdown.integration.test.ts`) is the proof. Rerun it
 after changing the agent's settings, permissions, flags or environment, and after Claude Code
 upgrades.

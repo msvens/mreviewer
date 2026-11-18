@@ -4,6 +4,7 @@ import {
 	ConfigError,
 	DraftError,
 	describeChecks,
+	HeadMovedError,
 	LockBusyError,
 	PostError,
 	type PostOptions,
@@ -227,7 +228,10 @@ export async function run(
 		return result.draftExists && o.exitCode === 0 && !o.result?.isError ? 0 : 2;
 	} catch (err) {
 		const known =
-			err instanceof ConfigError || err instanceof LockBusyError || err instanceof PrRefError;
+			err instanceof ConfigError ||
+			err instanceof LockBusyError ||
+			err instanceof PrRefError ||
+			err instanceof HeadMovedError;
 		io.err(known ? (err as Error).message : `Review failed: ${(err as Error).stack ?? err}`);
 		return 2;
 	}

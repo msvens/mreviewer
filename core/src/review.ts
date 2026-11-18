@@ -14,7 +14,12 @@ import { acquireRunLock } from './lock.ts';
 import { formatPrRef, type PrRef, parsePrRef, repoName } from './pr-ref.ts';
 import { type GitHubContext, writeGitHubContext } from './prefetch.ts';
 import { preparePost, sendPost } from './post/post.ts';
-import { type PrWorktree, preparePrWorktree, removePrWorktree } from './worktree.ts';
+import {
+	HeadMovedError,
+	type PrWorktree,
+	preparePrWorktree,
+	removePrWorktree
+} from './worktree.ts';
 
 export interface ReviewOptions {
 	paths?: InstancePaths;
@@ -30,7 +35,11 @@ export interface ReviewOptions {
 	signal?: AbortSignal;
 	checkSandbox?: () => Promise<SandboxExecutor>;
 	checkHostExec?: Executor;
+	/** Wait before re-fetching a PR whose head moved (default 5s). */
+	retryDelayMs?: number;
 }
+
+const HEAD_ATTEMPTS = 3;
 
 /** What happened to the draft after the run. */
 export type PostStatus =
@@ -160,17 +169,28 @@ export async function reviewPr(input: string, opts: ReviewOptions = {}): Promise
 	const release = await acquireRunLock(paths.state.runLock, label);
 	try {
 		const github = opts.github ?? ghGitHub(opts.token ?? (await readToken()));
-		const pr = await github.pr(ref);
-		const wt = await preparePrWorktree({
-			repoDir: repo.dir,
-			repoSlug: ref.repo,
-			number: ref.number,
-			baseRef: pr.baseRef,
-			baseSha: pr.baseSha,
-			...(pr.commits[0] && { firstCommitSha: pr.commits[0].oid }),
-			expectedHeadSha: pr.headSha,
-			paths
-		});
+		// GitHub's API can lag a push by a few seconds: re-fetch and retry when the heads differ.
+		let pr: PrDetails;
+		let wt: PrWorktree;
+		for (let attempt = 1; ; attempt++) {
+			pr = await github.pr(ref);
+			try {
+				wt = await preparePrWorktree({
+					repoDir: repo.dir,
+					repoSlug: ref.repo,
+					number: ref.number,
+					baseRef: pr.baseRef,
+					baseSha: pr.baseSha,
+					...(pr.commits[0] && { firstCommitSha: pr.commits[0].oid }),
+					expectedHeadSha: pr.headSha,
+					paths
+				});
+				break;
+			} catch (err) {
+				if (!(err instanceof HeadMovedError) || attempt >= HEAD_ATTEMPTS) throw err;
+				await new Promise((r) => setTimeout(r, opts.retryDelayMs ?? 5_000));
+			}
+		}
 
 		const draftPath = join(
 			paths.state.drafts,

@@ -7,6 +7,7 @@ import { instancePaths } from '../src/home.ts';
 import type { SandboxExecutor } from '../src/checks/sandbox.ts';
 import { acquireRunLock, LockBusyError } from '../src/lock.ts';
 import { reviewPr } from '../src/review.ts';
+import { HeadMovedError } from '../src/worktree.ts';
 import { createGitFixture, type GitFixture, sh } from './helpers/git-fixture.ts';
 
 /** Fake `claude`: reads the prompt, records what it saw, writes the draft unless told not to. */
@@ -254,12 +255,28 @@ describe('reviewPr', () => {
 		await release();
 	});
 
-	it('releases the lock when the PR cannot be checked out', async () => {
+	it('retries when GitHub still shows the old head, then gives up and releases the lock', async () => {
+		let calls = 0;
+		const lagging: GitHub = {
+			...github,
+			pr: async () => ({ ...prDetails(), headSha: ++calls === 1 ? fx.baseSha : fx.headSha })
+		};
+		const r = await run('draft', { github: lagging, retryDelayMs: 0 });
+		expect(calls).toBe(2);
+		expect(r.draftExists).toBe(true);
+
+		calls = 0;
 		const moved: GitHub = {
 			...github,
-			pr: async () => ({ ...prDetails(), headSha: fx.baseSha })
+			pr: async () => {
+				calls++;
+				return { ...prDetails(), headSha: fx.baseSha };
+			}
 		};
-		await expect(run('draft', { github: moved })).rejects.toThrow(/head moved/);
+		await expect(run('draft', { github: moved, retryDelayMs: 0 })).rejects.toBeInstanceOf(
+			HeadMovedError
+		);
+		expect(calls).toBe(3);
 		expect(existsSync(paths.state.runLock)).toBe(false);
 	});
 });

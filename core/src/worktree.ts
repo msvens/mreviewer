@@ -3,6 +3,16 @@ import { join } from 'node:path';
 import { git } from './git.ts';
 import type { InstancePaths } from './home.ts';
 
+/** GitHub's PR head and the fetched head differ, usually because GitHub's API lags a push. */
+export class HeadMovedError extends Error {
+	constructor(number: number, expected: string, fetched: string) {
+		super(
+			`PR #${number} head moved: GitHub says ${expected.slice(0, 7)}, fetched ${fetched.slice(0, 7)}. Try again in a moment.`
+		);
+		this.name = 'HeadMovedError';
+	}
+}
+
 export interface PrWorktree {
 	/** The user's local checkout the worktree belongs to. */
 	repoDir: string;
@@ -69,9 +79,7 @@ export async function preparePrWorktree(input: PrepareInput): Promise<PrWorktree
 	]);
 	const headSha = await git(repoDir, ['rev-parse', 'FETCH_HEAD']);
 	if (headSha !== input.expectedHeadSha) {
-		throw new Error(
-			`PR #${number} head moved: GitHub says ${input.expectedHeadSha.slice(0, 7)}, fetched ${headSha.slice(0, 7)}. Try again.`
-		);
+		throw new HeadMovedError(number, input.expectedHeadSha, headSha);
 	}
 
 	// For a merged PR the base branch tip already contains the head, which would make the

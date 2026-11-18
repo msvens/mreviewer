@@ -102,4 +102,9 @@ export {
 	type ReviewResult,
 	reviewPr
 } from './review.ts';
-export { type PrWorktree, preparePrWorktree, removePrWorktree } from './worktree.ts';
+export {
+	HeadMovedError,
+	type PrWorktree,
+	preparePrWorktree,
+	removePrWorktree
+} from './worktree.ts';
