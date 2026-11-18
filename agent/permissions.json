@@ -1,5 +1,5 @@
 {
-	"$comment": "Command rules for the runtime agent. core merges these into the per-run settings file (core/src/agent/settings.ts). Anything not allowed is denied (dontAsk mode); the deny list is a second line for commands that must never run, even if a broader allow is added later. The agent has no GitHub access: core prefetches PR data into the run directory, so every gh command is denied.",
+	"$comment": "Command rules for the runtime agent. core merges these into the per-run settings file (core/src/agent/settings.ts). Anything not allowed is denied (dontAsk mode); the deny list is a second line for commands that must never run, even if a broader allow is added later. The agent has no GitHub access: core prefetches PR data into the run directory, so every gh command is denied. Read-only shell utilities (cat, head, tail, wc, ls, nl, sed -n, grep, cut, sort, uniq, tr, echo, cd; not find, which can -exec or -delete) are allowed because the agent reaches for them in chained commands; the sandbox still confines what they read and write, and Claude Code checks every part of a chained command.",
 	"allow": [
 		"Read",
 		"Grep",
@@ -13,7 +13,21 @@
 		"Bash(git -C * show *)",
 		"Bash(git -C * diff *)",
 		"Bash(git -C * status *)",
-		"Bash(git -C * blame *)"
+		"Bash(git -C * blame *)",
+		"Bash(cd *)",
+		"Bash(cat *)",
+		"Bash(head *)",
+		"Bash(tail *)",
+		"Bash(wc *)",
+		"Bash(ls *)",
+		"Bash(nl *)",
+		"Bash(sed -n *)",
+		"Bash(grep *)",
+		"Bash(cut *)",
+		"Bash(sort *)",
+		"Bash(uniq *)",
+		"Bash(tr *)",
+		"Bash(echo *)"
 	],
 	"deny": [
 		"Bash(gh *)",
@@ -41,6 +55,8 @@
 		"Bash(curl *)",
 		"Bash(wget *)",
 		"Bash(gh api *)",
-		"Bash(gh pr merge *)"
+		"Bash(gh pr merge *)",
+		"Bash(sed *-i*)",
+		"Bash(sed *--in-place*)"
 	]
 }
